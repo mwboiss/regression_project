@@ -1,10 +1,12 @@
+# Import for data manipulation
 import pandas as pd
+import numpy as np
 
+# Import for scaling and splitting data
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
-import sklearn.preprocessing
-
+# Import for database access
 from env import get_db_url
 import os
 
@@ -38,10 +40,11 @@ def get_zillow_data(use_cache=True):
     calculatedfinishedsquarefeet,\
     taxvaluedollarcnt,\
     yearbuilt,\
-    taxamount,\
     fips
     FROM properties_2017
-    LEFT JOIN propertylandusetype
+    JOIN predictions_2017
+    USING(parcelid)
+    JOIN propertylandusetype
     USING(propertylandusetypeid)
     WHERE propertylandusetypeid = 261
     ''', url)
@@ -55,41 +58,71 @@ def get_zillow_data(use_cache=True):
     # Return DataFrame
     return zillow_data
 
-
-def wrangle_zillow(use_cache=True):
+def prep_zillow(df):
     '''
     function used to wrangle zillow data
     '''
-    # Get Zillow data
-    zillow = get_zillow_data(use_cache)
         
     # Rename columns
-    zillow = zillow.rename(columns={'bedroomcnt' : 'bedrooms',\
-                                'bathroomcnt' : 'bathrooms',\
-                                'calculatedfinishedsquarefeet' : 'area',\
-                                'taxvaluedollarcnt' : 'taxable_value',\
-                                'yearbuilt' : 'year_built',\
-                                'taxamount' : 'tax_amount',\
-                                'fips' : 'county'})
+    df = df.rename(columns={'bedroomcnt' : 'bedrooms',\
+                            'bathroomcnt' : 'bathrooms',\
+                            'calculatedfinishedsquarefeet' : 'area',\
+                            'taxvaluedollarcnt' : 'taxable_value',\
+                            'yearbuilt' : 'year_built',\
+                            'fips' : 'county'})
+    
+     # Create a variable that shows the age of the house in 2017
+    df['house_age_2017'] = 2017 - df.year_built 
+    
+    # Create a variable that shows the ratio of bedrooms to bathrooms
+    df['bed_to_bath_ratio'] = df.bedrooms / df.bathrooms
+
+    # Replace infinite values with NaN to be dropped later
+    df = df.replace(np.inf, np.nan)
     
     # Drop Nulls
-    zillow = zillow.dropna()
+    df = df.dropna()
     
     # Map county values to name of county
-    zillow.county = zillow.county.map({6037.0 : 'los_angeles_ca',\
-                                       6059.0 : 'orange_ca',\
-                                       6111.0 : 'ventura_ca'})
-    
+    df.county = df.county.map({6037.0 : 'los_angeles_ca',\
+                               6059.0 : 'orange_ca',\
+                               6111.0 : 'ventura_ca'})
     
     # One hot encode county 
 
     # Get dummy variables
-    dummy_name = pd.get_dummies(zillow[['county']])
+    dummy_name = pd.get_dummies(df[['county']])
 
     # Concat dummy_name to dataframe
-    zillow = pd.concat([zillow,dummy_name],axis=1)
+    df = pd.concat([df,dummy_name],axis=1)
     
-    return zillow
+    return df
+
+def remove_outliers(df, column_list):
+    ''' remove outliers from dataframe 
+        then return the new dataframe
+    '''
+    # Iterate through column_list
+    for col in column_list:
+        
+        # find percentiles
+        q_25 = np.percentile(df[col], 25)
+        q_75 = np.percentile(df[col], 75)
+        
+        # Calculate IQR
+        iqr = q_75 - q_25
+        
+        # assign upper bound
+        upper_bound = q_75 + 1.5 * iqr   
+        
+        # assign lower bound 
+        lower_bound = q_25 - 1.5 * iqr   
+
+        # assign df without outliers
+        df = df[(df[col] > lower_bound) & (df[col] < upper_bound)]
+        
+    # return dataframe without outliers    
+    return df
 
 def split_zillow(df):
     '''
@@ -106,7 +139,6 @@ def split_zillow(df):
     
     # The funciton returns the split sets
     return train, validate, test
-
 
 def scale_data(train, validate, test, return_scaler=False):
     '''
@@ -133,3 +165,27 @@ def scale_data(train, validate, test, return_scaler=False):
         return train_scaled, validate_scaled, test_scaled, scaler
     else:
         return train_scaled, validate_scaled, test_scaled
+ 
+def model_split(df):
+    
+    # Assign x for testing the model, y as target for modeling
+    X = df.drop(columns=['taxable_value'])
+    y = df[['taxable_value']]
+    
+    return X, y
+
+def wrangle_zillow(use_cache = True):
+    
+    # Get Zillow data from database
+    zillow = get_zillow_data(use_cache)
+    
+    # Prepare Zillow data
+    zillow = prep_zillow(zillow)
+    
+    # remove outliers
+    zillow = remove_outliers(zillow, ['bedrooms','bathrooms','year_built','area','taxable_value','house_age_2017','bed_to_bath_ratio'])
+     
+    # Split the data for modeling
+    train, validate, test = split_zillow(zillow)
+    
+    return train, validate, test
