@@ -1,6 +1,6 @@
 # Innis-Regression-Project
 
-This repo is a 
+This repo is a compilation of work done to explore possible features for improving zillow models for predicting tax assessed values for single family properties sold in 2017.
 
 ## About the Project
 
@@ -10,7 +10,7 @@ The goal of this project is to gain insight on how to improve models that predic
 
 ### Project Description
 
-
+Providing acurrate data to our customer base is of upmost importance. Here at Zillow we pride ourselves in consistant improvement. Imporving our predictive models can help us keep an edge in this highly competitive online space. In this project I will explore what features we can use to improve our current models to predict tax assessed values of Single Family Properties that had a transaction in 2017.
 
 ### Initial Questions
 
@@ -24,7 +24,13 @@ The goal of this project is to gain insight on how to improve models that predic
 
 ### Summary of Findings
 
+- In exploration we saw that area and year_built were good indicators of taxable_value. While bathrooms performed better both bathroom and bedroom count also showed promise.
 
+- In the modeling phase the top performers all had the original features so the newly created features could be dropped or reassesed as they did not show significant improvment.
+
+### Project Report
+
+https://github.com/mwboiss/regression_project/blob/main/Report.ipynb
 
 ### Data Dictionary
 

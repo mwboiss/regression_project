@@ -165,7 +165,7 @@ def scale_data(train, validate, test, return_scaler=False):
         return train_scaled, validate_scaled, test_scaled, scaler
     else:
         return train_scaled, validate_scaled, test_scaled
- 
+
 def model_split(df):
     
     # Assign x for testing the model, y as target for modeling
